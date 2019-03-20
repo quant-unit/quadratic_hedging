@@ -1,0 +1,10 @@
+# .gitignore
+
+**/data_in
+**/results
+
+data_in/
+results/
+
+.DS_Store
+.Rhistory
