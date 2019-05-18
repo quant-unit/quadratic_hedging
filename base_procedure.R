@@ -101,13 +101,13 @@ base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step
   for(i in 1:iterations) {
     # select or create data
     if(i == iterations) {
-      df.data <- preqin.basis$df.vc
+      list.of.dfs <- preqin.basis$df.vc
     } else {
-      df.data <- create.df.vc.us(TRUE)$df.vc
+      list.of.dfs <- create.df.vc.us(TRUE)$df.vc
     }
     
     # remove vintage for cross validation
-    if(partition %in% names(df.data)) df.data[partition] <- NULL
+    if(partition %in% names(list.of.dfs)) list.of.dfs[partition] <- NULL
     
     # restrict no of predictor-factors (hard threshold)
     rows2use <- 1:nrow(fp.coefs)
@@ -123,7 +123,7 @@ base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step
       
       f <- function(x) {
         y <- base_procedure$empirical.loss(x, 
-                           data.list = df.data,
+                           data.list = list.of.dfs,
                            perc.fee = perc.fee,
                            predictor.coefs = fp.coefs,
                            factor = factor,

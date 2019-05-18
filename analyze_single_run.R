@@ -72,7 +72,7 @@ analyze_single_run$plot.df <- function(run.ob, Coefs = "Full", do.eps = FALSE, t
     par(mfrow=c(1,1), cex=1.3)
   }
   
-  par(mar = c(4.1, 4.1, 1, 14.5))
+  par(mar = c(4.1, 4.1, 1, 15))
   plot(x = 0:(nrow(df)-1), y = df[, 1], type = "l", ylim = c(min(df), max(df)), 
        col = "gray50",
        # main = "Componentwise L2 Boosting Coefficients",
@@ -83,7 +83,7 @@ analyze_single_run$plot.df <- function(run.ob, Coefs = "Full", do.eps = FALSE, t
   }
   axis(side = 4, # right side
        at = df[nrow(df), ], 
-       labels = colnames(df), 
+       labels = paste(round(df[nrow(df), ],2), colnames(df)), 
        las = 1) # horizontal text rotation
   
   # legend("right", bty="n", legend = colnames(df), col = 1:ncol(df), lty = 1, cex=1)

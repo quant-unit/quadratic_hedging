@@ -73,7 +73,7 @@ preqin_basis$create.preqin.basis <- function(do.boostrap = FALSE,
   
   out.list <- list()
   for(vintage in seq(1986,2000)) {
-    # print(vintage)
+    print(vintage)
     df.vc.us <- data.frame(df.pq)
     vc.types <- c("Balanced", "Early Stage", "Early Stage: Seed", "Early Stage: Start-up", 
                   "Expansion / Late Stage", "Venture (General)", "Venture Debt")
@@ -82,7 +82,7 @@ preqin_basis$create.preqin.basis <- function(do.boostrap = FALSE,
     df.vc.us <- df.vc.us[df.vc.us$Vintage == vintage, ]
     # df.vc.us <- df.vc.us[df.vc.us$Fund.Status == "Liquidated", ]
     no.funds <- length(unique(df.vc.us$Fund.ID))
-    # print(paste("# funds:", no.funds))
+    print(paste("# funds:", no.funds))
     
     # bootstrap
     if(do.boostrap) {
@@ -207,3 +207,5 @@ if(sys.nframe() == 0L) {
   preqin_basis$main()
 }
 
+# Number of VC funds in preqin data set
+sum(c(7, 4, 3, 5, 7, 2, 9, 9, 11, 15, 14, 20, 31, 37, 73))
