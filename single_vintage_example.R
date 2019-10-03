@@ -12,11 +12,11 @@ source("base_procedure.R")
 
 # Gain function vintage year wrapper  ---------
 single_vintage_example$gain.process.vin <- function(vintage, PreCoef, preqin.basis, perc.fee) {
-  base_procedure$gain.process(0, 
+  base_procedure$gain.process1(0, 
                PreCoef = PreCoef,
                df = preqin.basis$df.vc[[as.character(vintage)]],                             
                factor = "NASDAQ.Numeraire",
-               predictor = "One", 
+               predictor = "One",
                perc.fee = perc.fee)
 }
 
@@ -65,7 +65,7 @@ single_vintage_example$plot.single.vin <- function(do.eps, PreCoef, preqin.basis
 single_vintage_example$plot.example.dynamics <- function(preqin.basis) {
   
   cost.list <- single_vintage_example$gain.process.vin(vintage = vintage, preqin.basis = preqin.basis, perc.fee = 0,
-                                PreCoef = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis))
+                                PreCoef = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis)$df)
   
   df.vc.us <- preqin.basis$df.vc[[as.character(vintage)]]
   
@@ -117,8 +117,8 @@ if(sys.nframe() == 0L) {
   preqin.basis_single.vintage <- single_vintage_example$delte_vintages(preqin.basis)
 
   # Estimate perfect ex-post single vintage year hedge
-  predictor.coefs <- base_procedure$base.procedure(
-    fp.coefs = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis_single.vintage), 
+  predictor.coefs <- base_procedure$base.procedure1(
+    fp.coefs = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis_single.vintage)$df, 
                                     perc.fee = perc.fee, preqin.basis = preqin.basis_single.vintage, 
                                     step.len = 1, p.set = "One", f.set = "NASDAQ.Numeraire")
   print(predictor.coefs)

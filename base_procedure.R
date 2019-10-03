@@ -41,11 +41,14 @@ base_procedure$create.predictor.coefs <- function (use.stability = FALSE, preqin
     predictor.coefs <- stability.selection.predictor.coefs(stability.path)
   }
   
-  return(predictor.coefs)
+  rownames(predictor.coefs) <- paste(predictor.coefs$Factor, predictor.coefs$Predictor)
+  return(list(df = predictor.coefs, error = NA))
 }
 
 # Gain Process ------------
-base_procedure$gain.process <- function(par, 
+Rcpp::sourceCpp('GHV.cpp')
+
+base_procedure$gain.process1 <- function(par, 
                          df, 
                          PreCoef,
                          factor,
@@ -59,19 +62,36 @@ base_procedure$gain.process <- function(par,
             PreCoef$Factor == factor, "Coef"] <- PreCoef[PreCoef$Predictor == predictor & 
                                                            PreCoef$Factor == factor, "Coef"] + par
   
-  G <- cumsum(apply(PreCoef, 1, function(x){
-    (df[, x["Factor"]] - perc.fee) * df[, x["Predictor"]]
-  }) %*% PreCoef[, "Coef"] * df$NAV.lag1  / df$Numeraire.Index)
+  PreCoef.nonzero <- PreCoef[PreCoef$Coef != 0, ]
+  
+  if(nrow(PreCoef.nonzero) == 0) {
+    G <- df$Numeraire.Index * 0
+  } else {
+    G <- cumsum(apply(PreCoef.nonzero, 1, function(x){
+      (df[, x["Factor"]] - perc.fee) * df[, x["Predictor"]]
+    }) %*% PreCoef.nonzero[, "Coef"] * df$NAV.lag1  / df$Numeraire.Index)
+  }
+  
   
   return(list(H = H, V = V, G = G, PreCoef = PreCoef))
 }
 
+base_procedure$gain.process <- function(par, 
+                                        df, 
+                                        PreCoef,
+                                        FactorPredictor,
+                                        perc.fee) {
+  # Update Predictor x Factor Coefficient
+  PreCoef[FactorPredictor, "Coef"] <- PreCoef[FactorPredictor, "Coef"] + par
+  
+  return(GHV_cpp(df, PreCoef, perc.fee))
+}
 
 # Empirical Loss Function -------------
-base_procedure$empirical.loss <- function(par, data.list, perc.fee, factor, predictor, predictor.coefs) {
+base_procedure$empirical.loss1 <- function(par, data.list, perc.fee, factor, predictor, predictor.coefs) {
   R.list <- list()
   for(vin in names(data.list)) {
-    gain.list <- base_procedure$gain.process(par, df = data.list[[vin]], 
+    gain.list <- base_procedure$gain.process1(par, df = data.list[[vin]], 
                               PreCoef = predictor.coefs, 
                               factor = factor,
                               predictor = predictor,
@@ -90,9 +110,20 @@ base_procedure$empirical.loss <- function(par, data.list, perc.fee, factor, pred
   return( sum(unlist(R.list)) )
 }
 
+base_procedure$empirical.loss <- function(par, data.list, perc.fee, FactorPredictor, predictor.coefs) {
+  empirical.loss.value <- 0 
+  for(vin in names(data.list)) {
+    empirical.loss.value <- empirical.loss.value + base_procedure$gain.process(par, df = data.list[[vin]], 
+                                                                               PreCoef = predictor.coefs, 
+                                                                               FactorPredictor = FactorPredictor,
+                                                                               perc.fee = perc.fee)
+  }
+  return(empirical.loss.value)
+}
+
 
 # Define base procedure ------------
-base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step.len = 0.3, bound = 100, p.set = NA, f.set = NA, partition = "Full") {
+base_procedure$base.procedure1 <- function(fp.coefs, perc.fee, preqin.basis, step.len = 0.3, bound = 100, p.set = NA, f.set = NA, partition = "Full") {
   
   if(!is.na(p.set)) fp.coefs <- fp.coefs[fp.coefs$Predictor %in% p.set, ]
   if(!is.na(f.set)) fp.coefs <- fp.coefs[fp.coefs$Factor %in% f.set, ]
@@ -122,7 +153,7 @@ base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step
       predictor <- fp.coefs$Predictor[row]
       
       f <- function(x) {
-        y <- base_procedure$empirical.loss(x, 
+        y <- base_procedure$empirical.loss1(x, 
                            data.list = list.of.dfs,
                            perc.fee = perc.fee,
                            predictor.coefs = fp.coefs,
@@ -158,6 +189,41 @@ base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step
   return(fp.coefs)
 }
 
+base_procedure$base.procedure <- function(fp.coefs, perc.fee, preqin.basis, step.len = 0.3, bound = 100, partition = "Full") {
+  
+  # remove vintage for cross validation
+  if(partition != "Full") preqin.basis$df.vc[partition] <- NULL
+  
+  # restrict no of predictor-factors (hard threshold)
+  rows2use <- 1:nrow(fp.coefs)
+  #if(sum(fp.coefs$Coef != 0) == 60) rows2use <- as.numeric(rownames(fp.coefs[fp.coefs$Coef != 0, ]))
+  
+  # try all combinations
+  opti.objective <- Inf
+  for(row in rows2use) {
+    FacPred <- rownames(fp.coefs)[row]
+    f <- function(x) {
+      y <- base_procedure$empirical.loss(x, 
+                                         data.list = preqin.basis$df.vc,
+                                         FactorPredictor = FacPred,
+                                         perc.fee = perc.fee,
+                                         predictor.coefs = fp.coefs)
+      return(y)
+    }
+    
+    res <- optimize(f, c(-bound, bound))
+    
+    if(res$objective < opti.objective) {
+      opti.FP <- FacPred
+      opti.objective <- res$objective
+      opti.coef.addition <- res$minimum
+    }
+  }
+
+  fp.coefs[opti.FP, "Coef"] <- step.len * opti.coef.addition + fp.coefs[opti.FP, "Coef"]
+  
+  return(list(df = fp.coefs, error = opti.objective))
+}
 
 # Epilogue ------
 
@@ -173,36 +239,35 @@ if(sys.nframe() == 0L) {
   # Gain process
   base_procedure$gain.process(par = 0, 
                df = preqin.basis$df.vc$`1992`, 
-               PreCoef = create.predictor.coefs(preqin.basis = preqin.basis),
-               factor = "NASDAQ.Numeraire",
-               predictor = "One", 
+               PreCoef = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis)$df,
+               FactorPredictor = paste("NASDAQ.Numeraire", "One"),
                perc.fee = 2/100/12)
   
   # Empirical loss
   base_procedure$empirical.loss(10, 
                  data.list = preqin.basis$df.vc, 
                  perc.fee = 2/100/12,
-                 factor = "NASDAQ.Numeraire", 
-                 predictor = "One", 
-                 predictor.coefs = create.predictor.coefs(preqin.basis = preqin.basis))
+                 FactorPredictor = paste("NASDAQ.Numeraire", "One"),
+                 predictor.coefs = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis)$df)
   
   # Base procedure
-  base_procedure$base.procedure(fp.coefs = create.predictor.coefs(preqin.basis = preqin.basis), 
+  base_procedure$base.procedure(
+    fp.coefs = base_procedure$create.predictor.coefs(preqin.basis = preqin.basis)$df, 
                  perc.fee = 0, 
                  preqin.basis = preqin.basis)
   
   # Test base procedure
   system.time({
       # Init
-      predictor.coefs <- create.predictor.coefs(preqin.basis = preqin.basis)
+      predictor.coefs <- base_procedure$create.predictor.coefs(preqin.basis = preqin.basis)
       
-      for(i in 1:3) {
+      for(i in 1:100) {
         print(i)
-        predictor.coefs <- base_procedure$base.procedure(fp.coefs = predictor.coefs, 
+        predictor.coefs <- base_procedure$base.procedure(fp.coefs = predictor.coefs$df, 
                                           perc.fee = 2/100/12, 
                                           preqin.basis = preqin.basis)
       }
-      print(predictor.coefs[predictor.coefs$Coef != 0, ])
+      print(predictor.coefs$df[predictor.coefs$df$Coef != 0, ])
     })
   
 }

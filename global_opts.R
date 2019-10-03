@@ -4,7 +4,7 @@
 
 create.EPS <- FALSE
 vintage <- 1992
-run.parallel <- FALSE
+run.parallel <- TRUE
 
 # run_boost
 iteration.run_boost <- 10

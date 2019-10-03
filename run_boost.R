@@ -8,6 +8,7 @@ setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 getwd()
 source("global_opts.R")
 source("base_procedure.R")
+library(parallel)
 
 # Make opts ----------
 run_boost$make.opts <- function(numeraire, use.stability, fee, iter) {
@@ -35,32 +36,24 @@ run_boost$run.boost <- function(partition, preqin.basis, run.name, iter, perc.fe
   # Step 1: initialize
   predictor.coefs <- base_procedure$create.predictor.coefs(use.stability = use.stability, preqin.basis = preqin.basis)
   
-  predictor.coefs <- base_procedure$base.procedure(predictor.coefs, perc.fee = perc.fee, partition = partition, preqin.basis = preqin.basis)
-  boost.list[[1]] <- predictor.coefs[, "Coef"]
-  
   # Step 2: update & iterate
   for(i in 1:iter) {
-    print(i)
+    #print(i)
     
-    predictor.coefs <- base_procedure$base.procedure(predictor.coefs, perc.fee = perc.fee, partition = partition, preqin.basis = preqin.basis)
-    boost.list[[i+1]] <- predictor.coefs[, "Coef"]
+    predictor.coefs <- base_procedure$base.procedure(predictor.coefs$df, perc.fee = perc.fee, partition = partition, preqin.basis = preqin.basis)
+    boost.list[[i]] <- predictor.coefs$df[, "Coef"]
     
     if(partition %in% names(preqin.basis$df.vc)) {
-      cv.error[[i]] <- base_procedure$empirical.loss(par = 0, 
-                                      data.list = preqin.basis$df.vc[partition],
-                                      perc.fee = perc.fee,
-                                       factor = "NASDAQ.Numeraire", 
-                                       predictor = "One",
-                                       predictor.coefs = predictor.coefs)
+      cv.error[[i]] <- predictor.coefs$error
     }
     
   }
   
   # fill output list
   df.boost <- data.frame(t(do.call(cbind, boost.list)))
-  colnames(df.boost) <- paste(predictor.coefs$Factor, predictor.coefs$Predictor, sep="_")
+  colnames(df.boost) <- paste(predictor.coefs$df$Factor, predictor.coefs$df$Predictor, sep="_")
   df.boost <- df.boost[, colSums(df.boost != 0) > 0]
-  
+
   if(partition %in% names(preqin.basis$df.vc)) {
     cv.error <- unlist(cv.error)
   } else {
@@ -89,12 +82,17 @@ run_boost$run.boost.wrapper <- function(opts, run.parallel = FALSE) {
   }
   
   if(run.parallel) {
-    library(parallel)
-    cl <- makeCluster(detectCores() - 1)
-    clusterExport(cl,  varlist = c("base.procedure", "create.predictor.coefs",
-                                   "empirical.loss","gain.process", "opts", "run.boost"))
-    cv.list <- parLapply(cl, party, run.boost.opts)
-    stopCluster(cl)
+    
+    if(.Platform$OS.type == "unix") {
+      cv.list <- mclapply(party, run.boost.opts, mc.cores = parallel::detectCores())
+    } else {
+      cl <- makeCluster(detectCores() - 1)
+      clusterExport(cl,  varlist = c("base.procedure", "create.predictor.coefs",
+                                     "empirical.loss","gain.process", "opts", "run.boost"))
+      cv.list <- parLapply(cl, party, run.boost.opts)
+      stopCluster(cl)
+    }
+
   } else {
     cv.list <- lapply(party, run.boost.opts)
   }
@@ -114,7 +112,7 @@ run_boost$run.boost.wrapper.opts <- function(numeraireZ, feeZ, iteration) {
   run.name.list <- list()
   for(n in numeraireZ) {
     for(f in feeZ) {
-      print(paste(numeraireZ, feeZ))
+      print(paste(n, f))
       opts <- run_boost$make.opts(numeraire = n, 
                         use.stability = FALSE, 
                         fee = f, 
@@ -129,7 +127,6 @@ run_boost$run.boost.wrapper.opts <- function(numeraireZ, feeZ, iteration) {
 
 
 # Epilogue ----------
-
 run_boost$main <- function() {
   run_boost$run.boost.wrapper.opts(numeraireZ = numeraireZ.run_boost, 
                                    feeZ = feez.run_boost, 
@@ -150,4 +147,5 @@ if(sys.nframe() == 0L) {
   
   # test main function: run.boost.wrapper.opts()
   system.time(run.name.list <- run_boost$main())
+  for(run.name in run.name.list) print(run.name)
 }

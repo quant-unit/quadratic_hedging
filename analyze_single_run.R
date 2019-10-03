@@ -14,7 +14,7 @@ analyze_single_run$extract.run <- function(run.name) {
   out.list <- list()
   
   cv.list <- list()
-  for(filename in list.files("Results")) {
+  for(filename in list.files("results")) {
     if(grepl(run.name, filename)) {
       
       if(grepl("add.info", filename)) {
@@ -131,7 +131,7 @@ analyze_single_run$tex.coef <- function(run.ob, add.percs = NA) {
   model.list = run.ob$cv.list$Full$model
   
   min.iter <- analyze_single_run$get.min.err(0, run.ob = run.ob)
-  df <- data.frame(t(model.list[min.iter,]))
+  df <- data.frame(t(model.list[min.iter, ]))
   colnames(df) <- paste("Coef", min.iter, sep = "_")
   df$Factor <- NA
   df$Predictor <- NA
@@ -253,7 +253,7 @@ if(sys.nframe() == 0L) {
   # list.files("results")
   
   # select run.name
-  run.name <- "2019-03-13_MSCI.World_f2_i10"
+  run.name <- "2019-10-01_MSCI.World_f2_i10"
   
   # extract cached run information
   run.ob <- analyze_single_run$extract.run(run.name)
@@ -272,11 +272,11 @@ if(sys.nframe() == 0L) {
   single_vintage_example$plot.single.vin(do.eps = create.EPS, 
                   perc.fee = analyze_single_run$name2fee(run.ob$run.name),
                   PreCoef = analyze_single_run$get.best.predictor.factor(run.ob), 
-                  preqin.basis = preqin.basis <- run.ob$preqin.basis)
+                  preqin.basis = run.ob$preqin.basis)
   
   # compare World vs. NoAm run
-  run.ob.World <- analyze_single_run$extract.run("2019-03-13_MSCI.World_f2_i10")
-  run.ob.NoAm <- analyze_single_run$extract.run("2019-03-13_MSCI.NoAm_f2_i10")
+  run.ob.World <- analyze_single_run$extract.run("2019-10-01_MSCI.World_f2_i10")
+  run.ob.NoAm  <- analyze_single_run$extract.run("2019-10-01_MSCI.NoAM_f2_i10")
   
   analyze_single_run$plot.cv.error.double()
   analyze_single_run$tex.repl.both()
