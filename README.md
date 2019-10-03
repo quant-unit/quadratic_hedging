@@ -8,12 +8,14 @@ The main.R script performs three tasks:
 
 2. Run componentwise boosting
 
-3. Perform stability selection (and run final boosting)
+3. Perform stability selection (and estimate final boosting model)
 
 The corresponding options can be set in the global_options.R file.
 
-# This code accompanies the following working paper
+# This code accompanies the following article
 
 Tausch - Quadratic hedging strategies for private equity fund payment streams (2019)
 
-http://quant-unit.com/quadratic-hedging-strategies/
+Published in the Journal of Finance and Data Science: https://doi.org/10.1016/j.jfds.2019.08.002
+
+Additional info: https://quant-unit.com/quadratic-hedging-strategies/
